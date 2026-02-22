@@ -1,0 +1,71 @@
+
+<?php elseif($page==='automation' && $isAdmin):
+// Добавление правила
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add'])){
+    $pdo->prepare("INSERT INTO automation (name, sensor, `condition`, value, pump_num, action) VALUES (?,?,?,?,?,?)")
+        ->execute([$_POST['name'], $_POST['sensor'], $_POST['condition'], $_POST['value'], $_POST['pump_num'], $_POST['action']]);
+    echo '<div class="alert alert-success">✓ Правило добавлено!</div>';
+}
+// Удаление правила
+if(isset($_GET['delete'])){
+    $pdo->prepare("DELETE FROM automation WHERE id = ?")->execute([intval($_GET['delete'])]);
+    header('Location: ?page=automation');
+    exit;
+}
+// Переключение правила
+if(isset($_GET['toggle'])){
+    $pdo->query("UPDATE automation SET enabled = NOT enabled WHERE id = " . intval($_GET['toggle']));
+    header('Location: ?page=automation');
+    exit;
+}
+$rules = $pdo->query("SELECT * FROM automation ORDER BY pump_num, id")->fetchAll(PDO::FETCH_ASSOC);
+$sensors = ['air_temp' => 'Т воздуха', 'root_temp' => 'Т корней', 'air_hum' => 'Влажность', 'ph' => 'pH', 'ec' => 'EC', 'cpu_temp' => 'Т CPU'];
+$conditions = ['>' => 'больше', '<' => 'меньше', '>=' => '≥', '<=' => '≤', '=' => 'равно'];
+?>
+<div class="section">
+<div class="section-title">🤖 Автоматизация насосов</div>
+<div class="alert alert-info">⏱ Правила проверяются каждую минуту. Добавьте в cron: <code>* * * * * php /var/www/wegabox/automation.php</code></div>
+
+<h3 style="margin:20px 0 15px">Активные правила</h3>
+<?php if(empty($rules)):?>
+<p style="color:#8b949e">Правил нет</p>
+<?php else:?>
+<table>
+<tr><th>Название</th><th>Условие</th><th>Действие</th><th>Статус</th><th></th></tr>
+<?php foreach($rules as $r): ?>
+<tr style="<?=$r['enabled']?'':'opacity:0.5'?>">
+<td><?=htmlspecialchars($r['name'])?></td>
+<td><?=$sensors[$r['sensor']]?> <?=$conditions[$r['condition']]?> <?=$r['value']?></td>
+<td>Насос <?=$r['pump_num']?> → <?=$r['action']==='on'?'🟢 ВКЛ':'⚪ ВЫКЛ'?></td>
+<td><a href="?page=automation&toggle=<?=$r['id']?>" style="color:<?=$r['enabled']?'#3fb950':'#f85149'?>"><?=$r['enabled']?'✓ Активно':'✗ Выкл'?></a></td>
+<td><a href="?page=automation&delete=<?=$r['id']?>" onclick="return confirm('Удалить?')" style="color:#f85149">🗑</a></td>
+</tr>
+<?php endforeach;?>
+</table>
+<?php endif;?>
+
+<h3 style="margin:30px 0 15px">Добавить правило</h3>
+<form method="POST" class="two-col">
+<div>
+<div class="form-group"><label>Название</label><input name="name" required placeholder="Охлаждение ON"></div>
+<div class="form-group"><label>Датчик</label><select name="sensor">
+<?php foreach($sensors as $k=>$v):?><option value="<?=$k?>"><?=$v?></option><?php endforeach;?>
+</select></div>
+<div class="form-group"><label>Условие</label><select name="condition">
+<?php foreach($conditions as $k=>$v):?><option value="<?=$k?>"><?=$v?></option><?php endforeach;?>
+</select></div>
+</div>
+<div>
+<div class="form-group"><label>Значение</label><input name="value" type="number" step="0.1" required placeholder="23"></div>
+<div class="form-group"><label>Насос</label><select name="pump_num">
+<option value="1">Насос 1</option><option value="2">Насос 2</option>
+<option value="3">Насос 3</option><option value="4">Насос 4</option>
+</select></div>
+<div class="form-group"><label>Действие</label><select name="action">
+<option value="on">Включить</option><option value="off">Выключить</option>
+</select></div>
+</div>
+</form>
+<button type="submit" name="add" form="" onclick="this.form=this.previousElementSibling;this.form.submit()" class="btn btn-primary">➕ Добавить правило</button>
+</div>
+<?php endif;?>
